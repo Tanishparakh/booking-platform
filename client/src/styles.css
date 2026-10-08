@@ -50,3 +50,13 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px 10px
 .center{max-width:440px;margin:40px auto}
 .hint{background:#f3f4ff;border:1px dashed #b9b4ff;border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:12px}
 @media(max-width:600px){.wrap{padding:12px 10px}.nav .brand{width:100%}}
+.date-chip{cursor:pointer;transition:transform .15s,box-shadow .15s;user-select:none}
+.date-chip:hover{transform:translateY(-1px);box-shadow:0 2px 5px rgba(0,0,0,.1)}
+.date-chip.selected{background:var(--brand)!important;color:#fff!important}
+@media print{
+  body *{visibility:hidden}
+  #printable-receipt,#printable-receipt *{visibility:visible}
+  #printable-receipt{position:absolute;left:0;top:0;width:100%;padding:20px}
+  .no-print,.nav,.modal-back{background:none!important;position:static!important;box-shadow:none!important}
+  .no-print{display:none!important}
+}

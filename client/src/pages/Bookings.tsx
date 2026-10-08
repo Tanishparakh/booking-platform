@@ -2,7 +2,7 @@ import { FormEvent, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { get, post } from '../api';
 import { useAuth } from '../auth';
-import { Alert, Badge, Card, dateRange, Empty, Field, fmtDateTime, hhmm, Modal, money, nice, Tabs, useAction, useLoad } from '../components/ui';
+import { Alert, Badge, Card, dateRange, Empty, Field, fmtDate, fmtDateTime, hhmm, Modal, money, nice, Tabs, useAction, useLoad } from '../components/ui';
 
 export function BookingList() {
   const { user } = useAuth();
@@ -31,7 +31,7 @@ export function BookingDetail() {
   const { user } = useAuth();
   const { data: b, error, reload } = useLoad(() => get('/bookings/' + id), [id]);
   const a = useAction();
-  const [modal, setModal] = useState<'cancel' | 'revision' | 'dispute' | 'review' | 'decline' | null>(null);
+  const [modal, setModal] = useState<'cancel' | 'revision' | 'dispute' | 'review' | 'decline' | 'invoice' | null>(null);
   if (error) return <Alert>{error}</Alert>;
   if (!b) return <Empty>Loading…</Empty>;
   const role = user!.role;
@@ -68,12 +68,19 @@ export function BookingDetail() {
 
           <Card title="Payment">
             {b.payment ? (
-              <table><tbody>
-                <tr><th>Status</th><td><Badge value={b.payment.status} /></td></tr>
-                {b.payment.card_last4 && <tr><th>Card</th><td>{b.payment.card_brand} •••• {b.payment.card_last4}</td></tr>}
-                {Number(b.payment.refunded_amount) > 0 && <tr><th>Refunded</th><td>{money(b.payment.refunded_amount)}</td></tr>}
-                {b.payout && <tr><th>Payout</th><td><Badge value={b.payout.status} /> {money(b.payout.net_amount)}{b.payout.failure_reason ? ` – ${b.payout.failure_reason}` : ''}</td></tr>}
-              </tbody></table>
+              <>
+                <table><tbody>
+                  <tr><th>Status</th><td><Badge value={b.payment.status} /></td></tr>
+                  {b.payment.card_last4 && <tr><th>Card</th><td>{b.payment.card_brand} •••• {b.payment.card_last4}</td></tr>}
+                  {Number(b.payment.refunded_amount) > 0 && <tr><th>Refunded</th><td>{money(b.payment.refunded_amount)}</td></tr>}
+                  {b.payout && <tr><th>Payout</th><td><Badge value={b.payout.status} /> {money(b.payout.net_amount)}{b.payout.failure_reason ? ` – ${b.payout.failure_reason}` : ''}</td></tr>}
+                </tbody></table>
+                <div style={{ marginTop: 12 }}>
+                  <button className="btn secondary sm" onClick={() => setModal('invoice')}>
+                    🧾 View & Print Receipt
+                  </button>
+                </div>
+              </>
             ) : <Empty>No payment recorded.</Empty>}
             <p className="small dim">Funds are captured when the professional accepts, held by the platform, and released to the professional only after you approve the delivered work.</p>
           </Card>
@@ -111,6 +118,7 @@ export function BookingDetail() {
       {modal === 'revision' && <ReasonModal title="Request a revision" label="What should be changed?" required cta="Send request" onClose={() => setModal(null)} onSubmit={async (v) => { await post(`/bookings/${b.id}/revision`, { note: v }); reload(); }} />}
       {modal === 'dispute' && <DisputeModal id={b.id} onClose={() => setModal(null)} done={reload} />}
       {modal === 'review' && <ReviewModal id={b.id} onClose={() => setModal(null)} done={reload} />}
+      {modal === 'invoice' && <InvoiceModal b={b} onClose={() => setModal(null)} />}
     </>
   );
 }
@@ -205,5 +213,83 @@ function Messages({ bookingId, meId, disabled }: { bookingId: number; meId: numb
       <Alert>{a.error}</Alert>
       {disabled ? <p className="small dim">Messaging is closed for this booking.</p> : <form className="row" onSubmit={send}><input style={{ flex: 1 }} value={text} onChange={(e) => setText(e.target.value)} placeholder="Write a message…" required maxLength={2000} /><button className="btn" disabled={a.busy}>Send</button></form>}
     </Card>
+  );
+}
+
+function InvoiceModal({ b, onClose }: { b: any; onClose: () => void }) {
+  const invoiceNum = `FB-INV-${String(b.id).padStart(5, '0')}`;
+  const printReceipt = () => window.print();
+
+  return (
+    <Modal title="Booking Receipt & Invoice" onClose={onClose}>
+      <div id="printable-receipt" style={{ padding: '4px' }}>
+        <div className="row between" style={{ borderBottom: '2px solid var(--line)', paddingBottom: 12, marginBottom: 16 }}>
+          <div>
+            <h2 style={{ margin: 0, color: 'var(--brand)', fontSize: 22 }}>FrameBook</h2>
+            <div className="small dim">Creative Freelancer Marketplace</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div className="bold">{invoiceNum}</div>
+            <div className="small dim">Date: {fmtDate(b.created_at)}</div>
+            <div style={{ marginTop: 4 }}><Badge value={b.payment?.status || b.status} /></div>
+          </div>
+        </div>
+
+        <div className="grid g2" style={{ marginBottom: 16 }}>
+          <div style={{ background: '#f8fafc', padding: 10, borderRadius: 8 }}>
+            <div className="small dim bold" style={{ letterSpacing: '0.04em' }}>BILLED TO (CLIENT)</div>
+            <b>{b.client_name}</b>
+            <div className="small dim">Venue: {b.venue}</div>
+          </div>
+          <div style={{ background: '#f8fafc', padding: 10, borderRadius: 8 }}>
+            <div className="small dim bold" style={{ letterSpacing: '0.04em' }}>CREATIVE PROFESSIONAL</div>
+            <b>{b.professional_name}</b>
+            <div className="small dim">Event: {b.event_type}</div>
+          </div>
+        </div>
+
+        <table style={{ marginBottom: 16 }}>
+          <thead>
+            <tr>
+              <th>Service description</th>
+              <th>Shoot dates</th>
+              <th style={{ textAlign: 'right' }}>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <b>{b.package_name}</b>
+                <div className="small dim">{b.event_type} ({hhmm(b.start_time)}–{hhmm(b.end_time)} daily)</div>
+              </td>
+              <td>{dateRange(b.start_date, b.end_date)}</td>
+              <td style={{ textAlign: 'right' }}>{money(b.total_amount)}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <th colSpan={2} style={{ textAlign: 'right', borderTop: '2px solid var(--line)' }}>Total Paid:</th>
+              <th style={{ textAlign: 'right', borderTop: '2px solid var(--line)', fontSize: 16, color: 'var(--brand)' }}>{money(b.total_amount)}</th>
+            </tr>
+            {b.payment?.card_last4 && (
+              <tr>
+                <td colSpan={3} className="small dim" style={{ textAlign: 'right', borderTop: 'none' }}>
+                  Payment Method: {b.payment.card_brand} •••• {b.payment.card_last4} (Escrow Protected)
+                </td>
+              </tr>
+            )}
+          </tfoot>
+        </table>
+
+        <div className="hint" style={{ fontSize: 12, marginBottom: 16 }}>
+          🔒 <b>Escrow Protection:</b> Payment held securely by FrameBook until client approval of final deliverables.
+        </div>
+
+        <div className="row between no-print">
+          <button className="btn secondary" onClick={onClose}>Close</button>
+          <button className="btn" onClick={printReceipt}>🖨️ Print / Save PDF</button>
+        </div>
+      </div>
+    </Modal>
   );
 }

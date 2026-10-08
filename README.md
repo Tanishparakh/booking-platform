@@ -1,5 +1,7 @@
 # FrameBook – Freelance Photographer & Videographer Booking Platform
 
+[![CI](https://github.com/Tanishparakh/booking-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/Tanishparakh/booking-platform/actions/workflows/ci.yml)
+
 A complete, free, local-first marketplace where clients find, book and pay freelance photographers and videographers.
 Stack: **React + TypeScript (Vite)**, **Node + Express + TypeScript** REST API, **PostgreSQL**, **MinIO** (file storage), **MailHog** (email), Docker Compose, and a **mock payment gateway**. No paid services.
 

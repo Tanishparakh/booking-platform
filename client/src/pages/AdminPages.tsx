@@ -9,33 +9,130 @@ export function AdminDashboard() {
   if (!data) return <Empty>Loading…</Empty>;
   const count = (rows: any[], key: string, val: string) => rows.find((r) => r[key] === val)?.n ?? 0;
   const totalBookings = data.bookings.reduce((s: number, r: any) => s + r.n, 0);
+
+  const statuses = [
+    { key: 'COMPLETED', label: 'Completed', color: '#12805c', n: count(data.bookings, 'status', 'COMPLETED') },
+    { key: 'CONFIRMED', label: 'Confirmed / In-Progress', color: '#1d5fc7', n: count(data.bookings, 'status', 'CONFIRMED') + count(data.bookings, 'status', 'DELIVERED') },
+    { key: 'PENDING', label: 'Pending', color: '#a15c07', n: count(data.bookings, 'status', 'PENDING') },
+    { key: 'DISPUTED', label: 'Disputed', color: '#7a3ec2', n: count(data.bookings, 'status', 'DISPUTED') },
+    { key: 'CANCELLED', label: 'Cancelled / Declined', color: '#c0362c', n: count(data.bookings, 'status', 'CANCELLED') + count(data.bookings, 'status', 'DECLINED') },
+  ];
+
+  const photographers = (data.proTypes || []).find((p: any) => p.professional_type === 'PHOTOGRAPHER')?.n ?? 0;
+  const videographers = (data.proTypes || []).find((p: any) => p.professional_type === 'VIDEOGRAPHER')?.n ?? 0;
+  const totalPros = photographers + videographers || 1;
+  const photoPercent = Math.round((photographers / totalPros) * 100);
+
+  const revenueList = (data.recentRevenue && data.recentRevenue.length > 0)
+    ? data.recentRevenue
+    : [{ month: 'Current', revenue: Number(data.money.gross) || 0 }];
+  const maxRevenue = Math.max(...revenueList.map((r: any) => Number(r.revenue)), 1);
+
   return (
     <>
-      <h1>Platform overview</h1>
+      <div className="row between" style={{ marginBottom: 12 }}>
+        <h1>Platform analytics & overview</h1>
+      </div>
+
       <div className="grid g4">
         <Card><div className="dim small">Verifications waiting</div><div className="stat"><Link to="/admin/verifications">{data.queues.pending_verifications}</Link></div></Card>
         <Card><div className="dim small">Open disputes</div><div className="stat"><Link to="/staff/disputes">{data.queues.open_disputes}</Link></div></Card>
         <Card><div className="dim small">Reported content</div><div className="stat"><Link to="/staff/reports">{data.queues.open_reports}</Link></div></Card>
         <Card><div className="dim small">Payouts to process</div><div className="stat"><Link to="/admin/payments">{data.queues.pending_payouts}</Link></div></Card>
       </div>
+
+      {/* Visual Analytics Section */}
       <div className="grid g2">
-        <Card title="Money">
-          <table><tbody>
-            <tr><th>Gross payments held or released</th><td>{money(data.money.gross)}</td></tr>
-            <tr><th>Currently held in escrow</th><td>{money(data.money.held)}</td></tr>
-            <tr><th>Refunded</th><td>{money(data.money.refunded)}</td></tr>
-            <tr><th>Commission earned (completed bookings)</th><td className="bold">{money(data.money.commission)}</td></tr>
-          </tbody></table>
+        <Card title="Monthly revenue volume">
+          <p className="dim small" style={{ marginTop: -8, marginBottom: 16 }}>Gross transaction volume processed through platform escrow.</p>
+          <div style={{ display: 'flex', alignItems: 'flex-end', height: 160, gap: 16, padding: '10px 0', borderBottom: '1px solid var(--line)' }}>
+            {revenueList.map((item: any, i: number) => {
+              const h = Math.max(14, Math.round((Number(item.revenue) / maxRevenue) * 130));
+              return (
+                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                  <div className="small bold" style={{ fontSize: 11, color: 'var(--brand)' }}>{money(item.revenue)}</div>
+                  <div style={{
+                    width: '100%', maxWidth: 48, height: h,
+                    background: 'linear-gradient(180deg, var(--brand), #818cf8)',
+                    borderRadius: '6px 6px 2px 2px',
+                    transition: 'height 0.3s'
+                  }} />
+                  <div className="small dim" style={{ fontSize: 11, textAlign: 'center' }}>{item.month}</div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="row between" style={{ marginTop: 12 }}>
+            <span className="small dim">Total Processed: <b>{money(data.money.gross)}</b></span>
+            <span className="small dim">Commission Earned: <b style={{ color: 'var(--green)' }}>{money(data.money.commission)}</b></span>
+          </div>
         </Card>
-        <Card title="Users & bookings">
+
+        <Card title="Booking status distribution">
+          <p className="dim small" style={{ marginTop: -8, marginBottom: 16 }}>Breakdown of {totalBookings} total platform booking request(s).</p>
+          {/* Segmented Progress Bar */}
+          <div style={{ display: 'flex', height: 22, borderRadius: 8, overflow: 'hidden', background: '#eceff4', marginBottom: 16 }}>
+            {statuses.map((st) => {
+              const pct = totalBookings > 0 ? (st.n / totalBookings) * 100 : 0;
+              if (pct === 0) return null;
+              return <div key={st.key} style={{ width: `${pct}%`, background: st.color }} title={`${st.label}: ${st.n} (${Math.round(pct)}%)`} />;
+            })}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {statuses.map((st) => (
+              <div key={st.key} className="row between" style={{ fontSize: 13 }}>
+                <span className="row" style={{ gap: 8 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: st.color, display: 'inline-block' }} />
+                  {st.label}
+                </span>
+                <span><b>{st.n}</b> <span className="dim small">({totalBookings > 0 ? Math.round((st.n / totalBookings) * 100) : 0}%)</span></span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      <div className="grid g2">
+        <Card title="Creator community ratio">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span>📸 Photographers ({photographers})</span>
+            <span>🎥 Videographers ({videographers})</span>
+          </div>
+          <div style={{ height: 14, borderRadius: 8, overflow: 'hidden', display: 'flex', background: '#e0e7ff', marginBottom: 12 }}>
+            <div style={{ width: `${photoPercent}%`, background: 'var(--brand)' }} title={`Photographers: ${photoPercent}%`} />
+            <div style={{ width: `${100 - photoPercent}%`, background: '#ec4899' }} title={`Videographers: ${100 - photoPercent}%`} />
+          </div>
+          <p className="small dim">Marketplace balance: {photoPercent}% Photographers vs {100 - photoPercent}% Videographers across verified talent.</p>
+        </Card>
+
+        <Card title="Escrow & Financial Health">
           <table><tbody>
-            <tr><th>Clients</th><td>{count(data.users, 'role', 'CLIENT')}</td><th>Professionals</th><td>{count(data.users, 'role', 'PROFESSIONAL')}</td></tr>
-            <tr><th>Support staff</th><td>{count(data.users, 'role', 'SUPPORT')}</td><th>Admins</th><td>{count(data.users, 'role', 'ADMIN')}</td></tr>
-            <tr><th>Total bookings</th><td>{totalBookings}</td><th>Completed</th><td>{count(data.bookings, 'status', 'COMPLETED')}</td></tr>
-            <tr><th>Pending</th><td>{count(data.bookings, 'status', 'PENDING')}</td><th>Cancelled/declined</th><td>{count(data.bookings, 'status', 'CANCELLED') + count(data.bookings, 'status', 'DECLINED')}</td></tr>
+            <tr><th>Gross funds in flow</th><td>{money(data.money.gross)}</td></tr>
+            <tr><th>Currently locked in escrow</th><td><span className="badge blue">{money(data.money.held)}</span></td></tr>
+            <tr><th>Total refunds issued</th><td>{money(data.money.refunded)}</td></tr>
+            <tr><th>Net commission realized</th><td className="bold" style={{ color: 'var(--green)' }}>{money(data.money.commission)}</td></tr>
           </tbody></table>
         </Card>
       </div>
+
+      {data.topPros && data.topPros.length > 0 && (
+        <Card title="Top performing creators">
+          <div className="table-wrap"><table>
+            <thead><tr><th>Creator</th><th>Specialization</th><th>Bookings</th><th>Gross Volume</th></tr></thead>
+            <tbody>
+              {data.topPros.map((pro: any, i: number) => (
+                <tr key={i}>
+                  <td><b>{pro.full_name}</b></td>
+                  <td><Badge value={pro.professional_type} /></td>
+                  <td>{pro.bookings} booking(s)</td>
+                  <td className="bold">{money(pro.volume)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>
+        </Card>
+      )}
     </>
   );
 }

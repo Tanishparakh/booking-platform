@@ -114,7 +114,7 @@ adminRouter.get('/payments', async (_req, res) => {
 adminRouter.post('/payouts/retry', async (_req, res) => { await processPendingPayouts(); res.json({ message: 'Pending payouts processed' }); });
 
 adminRouter.get('/reports/summary', async (_req, res) => {
-  const [users, bookings, money, queues] = await Promise.all([
+  const [users, bookings, money, queues, proTypes, recentRevenue, topPros] = await Promise.all([
     query('SELECT role, count(*)::int AS n FROM users GROUP BY role'),
     query('SELECT status, count(*)::int AS n FROM bookings GROUP BY status'),
     one(`SELECT COALESCE(sum(amount) FILTER (WHERE status IN ('HELD','RELEASED')),0)::float AS gross,
@@ -124,9 +124,17 @@ adminRouter.get('/reports/summary', async (_req, res) => {
                 (SELECT count(*) FROM disputes WHERE status<>'RESOLVED')::int AS open_disputes,
                 (SELECT count(*) FROM content_reports WHERE status='OPEN')::int AS open_reports,
                 (SELECT count(*) FROM payouts WHERE status IN ('PENDING','FAILED'))::int AS pending_payouts`),
+    query('SELECT professional_type, count(*)::int AS n FROM professionals GROUP BY professional_type'),
+    query("SELECT to_char(created_at, 'Mon YYYY') AS month, COALESCE(sum(amount),0)::float AS revenue FROM payments WHERE status IN ('HELD','RELEASED') GROUP BY 1, date_trunc('month', created_at) ORDER BY date_trunc('month', created_at) ASC LIMIT 6"),
+    query(`SELECT u.full_name, p.professional_type, count(b.id)::int as bookings, COALESCE(sum(b.total_amount),0)::float as volume
+           FROM professionals p
+           JOIN users u ON u.id=p.user_id
+           LEFT JOIN bookings b ON b.professional_id=p.user_id AND b.status IN ('CONFIRMED','DELIVERED','COMPLETED')
+           GROUP BY u.id, u.full_name, p.professional_type
+           ORDER BY volume DESC, bookings DESC LIMIT 5`),
   ]);
   const commission = await one("SELECT COALESCE(sum(commission_amount),0)::float AS total FROM bookings WHERE status='COMPLETED'");
-  res.json({ users, bookings, money: { ...money, commission: commission.total }, queues });
+  res.json({ users, bookings, money: { ...money, commission: commission.total }, queues, proTypes, recentRevenue, topPros });
 });
 
 adminRouter.get('/audit', async (_req, res) => {
