@@ -4,3 +4,5 @@ dist
 server/storage
 *.log
 .vercel
+
+.vercel

@@ -9,7 +9,7 @@ const isTest = process.env.NODE_ENV === 'test';
 function secret(name: string, devDefault: string): string {
   const v = process.env[name];
   if (v) return v;
-  if (isProd) throw new Error(`${name} must be set in production`);
+  if (isProd && !process.env.VERCEL) throw new Error(`${name} must be set in production`);
   return devDefault;
 }
 
@@ -24,7 +24,7 @@ export const config = {
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
   storage: {
     driver: (process.env.STORAGE_DRIVER || 'local') as 'local' | 's3',
-    dir: path.resolve(process.env.STORAGE_DIR || './storage'),
+    dir: process.env.VERCEL ? '/tmp/storage' : path.resolve(process.env.STORAGE_DIR || './storage'),
     endpoint: process.env.S3_ENDPOINT || 'http://localhost:9000',
     accessKey: process.env.S3_ACCESS_KEY || 'minioadmin',
     secretKey: process.env.S3_SECRET_KEY || 'minioadmin',
