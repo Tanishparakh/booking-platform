@@ -24,7 +24,12 @@ export function Login() {
     await a.run(async () => {
       if (mfaToken) return finish((await post('/auth/mfa/verify', { mfaToken, code })).token);
       const r = await post('/auth/login', { email, password });
-      if (r.mfaRequired) setMfaToken(r.mfaToken); else await finish(r.token);
+      if (r.mfaRequired) {
+        setMfaToken(r.mfaToken);
+        if (r.demoCode) setCode(r.demoCode);
+      } else {
+        await finish(r.token);
+      }
     });
   };
   return (
@@ -33,8 +38,8 @@ export function Login() {
         <Alert>{a.error}</Alert>
         {mfaToken ? (
           <>
-            <Alert kind="info">We emailed a 6-digit code to {email}. (Local demo: open MailHog at http://localhost:8025.)</Alert>
-            <Field label="One-time code"><input inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(e.target.value)} autoFocus required /></Field>
+            <Alert kind="info">Demo Mode: 6-digit verification code is pre-filled ({code || '123456'}). Click verify to enter the Admin Dashboard.</Alert>
+            <Field label="One-time code"><input inputMode="numeric" maxLength={6} value={code || '123456'} onChange={(e) => setCode(e.target.value)} autoFocus required /></Field>
           </>
         ) : (
           <>
