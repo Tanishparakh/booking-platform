@@ -25,6 +25,9 @@ adminRouter.get('/verifications/:id/document', async (req, res) => {
   const v = await one('SELECT * FROM verifications WHERE id=$1', [Number(req.params.id)]);
   if (!v) throw notFound('Verification not found');
   await audit(req.user!.id, 'VIEW_DOCUMENT', 'verification', v.id);
+  if (v.document_key.startsWith('http://') || v.document_key.startsWith('https://')) {
+    return res.redirect(v.document_key);
+  }
   res.setHeader('Content-Type', v.content_type);
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.send(await storage.read(v.document_key));

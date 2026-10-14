@@ -78,6 +78,9 @@ publicRouter.get('/professionals/:id/availability', async (req, res) => {
 });
 
 async function send(res: any, key: string, contentType: string) {
+  if (key.startsWith('http://') || key.startsWith('https://')) {
+    return res.redirect(key);
+  }
   const data = await storage.read(key);
   res.setHeader('Content-Type', contentType);
   res.setHeader('Cache-Control', 'public, max-age=300');

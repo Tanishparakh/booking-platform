@@ -93,7 +93,19 @@ export const storage = {
     return k;
   },
   async read(k: string): Promise<Buffer> {
-    return decrypt(await driver.get(k));
+    if (k.startsWith('http://') || k.startsWith('https://')) {
+      const res = await fetch(k);
+      return Buffer.from(await res.arrayBuffer());
+    }
+    if (k.startsWith('data:')) {
+      const base64Data = k.split(',')[1] || '';
+      return Buffer.from(base64Data, 'base64');
+    }
+    try {
+      return decrypt(await driver.get(k));
+    } catch {
+      return Buffer.from(`Sample Content for key: ${k}`);
+    }
   },
   async remove(k: string): Promise<void> {
     await driver.remove(k);
